@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from urllib.parse import parse_qs
+
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -63,6 +65,14 @@ class DuckDuckGoSearchProvider(SearchProvider):
                 continue
             url = link.get("href", "")
             parsed = urlparse(url)
+            if parsed.netloc.endswith("duckduckgo.com") and parsed.path == "/l/":
+                uddg = parse_qs(parsed.query).get("uddg", [""])[0]
+                if uddg:
+                    url = uddg
+                    parsed = urlparse(url)
+            if not parsed.scheme:
+                url = "https:" + url if url.startswith("//") else "https://" + url.lstrip("/")
+                parsed = urlparse(url)
             domain = parsed.netloc.lower().replace("www.", "")
             if any(domain.endswith(x) for x in EXCLUDED_DOMAINS):
                 continue
