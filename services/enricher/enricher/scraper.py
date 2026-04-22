@@ -11,9 +11,16 @@ from bs4 import BeautifulSoup
 from .config import settings
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+OBFUSCATED_EMAIL_RE = re.compile(
+    r"([A-Za-z0-9._%+-]+)\s*(?:\[at\]|\(at\)|\s+at\s+)\s*([A-Za-z0-9.-]+)\s*(?:\[dot\]|\(dot\)|\s+dot\s+)\s*([A-Za-z]{2,})",
+    re.IGNORECASE,
+)
 PHONE_RE = re.compile(r"(?:\+?234|0)[\d\s\-()]{7,}")
 LINKEDIN_RE = re.compile(r"https?://(?:[\w.]+\.)?linkedin\.com/[^\s'\"]+")
 WHATSAPP_RE = re.compile(r"https?://(?:wa\.me|api\.whatsapp\.com)/[^\s'\"]+")
+CONTACT_PATH_KEYWORDS = ["contact", "about", "team", "career", "support", "reach", "get-in-touch", "office", "locations"]
+COMMON_CONTACT_PATHS = ["/contact", "/contact-us", "/about", "/about-us", "/get-in-touch", "/reach-us", "/support"]
+JUNK_EMAIL_DOMAINS = ("sentry.io", "wixpress.com", "example.com", "domain.com", "email.com")
 
 
 def allowed_by_robots(url: str) -> bool:
@@ -40,7 +47,18 @@ def fetch_page(url: str) -> str:
 def extract_text_and_links(base_url: str, html: str) -> tuple[str, list[str], str]:
     soup = BeautifulSoup(html, "html.parser")
     title = soup.title.get_text(strip=True) if soup.title else ""
-    text = soup.get_text(" ", strip=True)
+    text_parts = [soup.get_text(" ", strip=True)]
+    for a in soup.select('a[href^="mailto:"]'):
+        href = a.get("href", "").split("mailto:", 1)[-1].split("?")[0].strip()
+        if href:
+            text_parts.append(href)
+    for a in soup.select('a[href^="tel:"]'):
+        href = a.get("href", "").split("tel:", 1)[-1].strip()
+        if href:
+            text_parts.append(href)
+    for tag in soup.find_all(attrs={"itemprop": ["email", "telephone"]}):
+        text_parts.append(tag.get_text(" ", strip=True))
+    text = " ".join(text_parts)
     links = []
     for a in soup.select("a[href]"):
         href = urljoin(base_url, a.get("href"))
@@ -60,9 +78,10 @@ def crawl_candidate_pages(home_url: str, max_pages: int = 5) -> dict[str, str]:
     likely = [
         l
         for l in links
-        if any(k in l.lower() for k in ["contact", "about", "team", "career", "careers"])
+        if any(k in l.lower() for k in CONTACT_PATH_KEYWORDS)
     ]
-    targets = [urljoin(home_url, "/contact"), urljoin(home_url, "/about")] + likely
+    common_targets = [urljoin(home_url, p) for p in COMMON_CONTACT_PATHS]
+    targets = list(dict.fromkeys(likely + common_targets))
     for url in targets[: max_pages - 1]:
         if url in pages:
             continue
@@ -83,7 +102,11 @@ def extract_contacts(pages: dict[str, str]) -> dict:
     address = None
     for url, text in pages.items():
         for em in EMAIL_RE.findall(text):
-            emails.append((em.lower(), url))
+            em_low = em.lower()
+            if not any(em_low.endswith(d) for d in JUNK_EMAIL_DOMAINS):
+                emails.append((em_low, url))
+        for user, dom, tld in OBFUSCATED_EMAIL_RE.findall(text):
+            emails.append((f"{user}@{dom}.{tld}".lower(), url))
         for ph in PHONE_RE.findall(text):
             cleaned = re.sub(r"\s+", " ", ph).strip()
             phones.append((cleaned, url))
@@ -98,14 +121,18 @@ def extract_contacts(pages: dict[str, str]) -> dict:
         if not address and any(k in text.lower() for k in ["street", "road", "avenue", "lagos", "abuja"]):
             address = text[:200]
 
-    email = emails[0][0] if emails else None
-    phone = phones[0][0] if phones else None
+    site_domain = ""
+    if pages:
+        site_domain = urlparse(next(iter(pages))).netloc.replace("www.", "").lower()
+    on_domain = [(em, src) for em, src in emails if site_domain and em.endswith("@" + site_domain)]
+    chosen_email_pair = on_domain[0] if on_domain else (emails[0] if emails else (None, None))
+
     return {
-        "email": email,
-        "phone": phone,
+        "email": chosen_email_pair[0],
+        "phone": phones[0][0] if phones else None,
         "address": address,
         "linkedin_url": linkedin,
         "whatsapp_url": whatsapp,
-        "email_source_url": emails[0][1] if emails else None,
+        "email_source_url": chosen_email_pair[1],
         "phone_source_url": phones[0][1] if phones else None,
     }
