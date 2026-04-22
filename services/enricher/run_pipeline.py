@@ -5,5 +5,5 @@ from enricher.pipeline import EnrichmentPipeline
 
 if __name__ == "__main__":
     init_db()
-    run_id = EnrichmentPipeline().run(Path("data/input/NCEC_Update_April_2026.xlsx"), limit=25)
+    run_id = EnrichmentPipeline().run(Path("data/input/NCEC_Update_April_2026.xlsx"))
     print(f"Completed run {run_id}")
