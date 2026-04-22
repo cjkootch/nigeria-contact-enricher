@@ -49,12 +49,19 @@ class DuckDuckGoSearchProvider(SearchProvider):
 
     def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         time.sleep(settings.request_delay_seconds)
-        response = requests.get(
-            self.base_url,
-            params={"q": query, "kl": settings.duckduckgo_region},
-            timeout=settings.request_timeout_seconds,
-            headers={"User-Agent": settings.user_agent},
-        )
+        response = None
+        for attempt in range(settings.max_retries):
+            response = requests.get(
+                self.base_url,
+                params={"q": query, "kl": settings.duckduckgo_region},
+                timeout=settings.request_timeout_seconds,
+                headers={"User-Agent": settings.user_agent},
+            )
+            if response.status_code not in (429, 503):
+                break
+            backoff = settings.request_delay_seconds * (2 ** attempt) + attempt
+            logger.warning("DDG %s for %r, sleeping %.1fs (attempt %d/%d)", response.status_code, query, backoff, attempt + 1, settings.max_retries)
+            time.sleep(backoff)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         results: list[SearchResult] = []

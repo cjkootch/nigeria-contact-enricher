@@ -65,8 +65,13 @@ class EnrichmentPipeline:
                 ]
                 best = None
                 best_status = "no_match"
+                query_errors: list[str] = []
                 for q in queries:
-                    results = self.search.search(q, limit=3)
+                    try:
+                        results = self.search.search(q, limit=3)
+                    except Exception as sexc:
+                        query_errors.append(f"{q!r}: {sexc}")
+                        continue
                     for i, result in enumerate(results, start=1):
                         pages = crawl_candidate_pages(result.url, max_pages=3)
                         body = "\n".join(pages.values())
@@ -127,6 +132,9 @@ class EnrichmentPipeline:
                     company.processing_status = best_status
                 else:
                     company.processing_status = "no_match"
+                    if query_errors and len(query_errors) == len(queries):
+                        company.processing_status = "search_unavailable"
+                        company.notes = "; ".join(query_errors)[:500]
 
                 run.completed_rows += 1
                 db.commit()
@@ -151,13 +159,22 @@ class EnrichmentPipeline:
                 db.commit()
                 output_rows.append({"company_name": row.get("company_name"), "status": "failed", "notes": str(exc)})
 
+            if len(output_rows) % 10 == 0:
+                _flush_outputs(output_rows)
+
         run.completed_at = datetime.utcnow()
         db.commit()
         run_id = run.id
 
-        out_csv = Path("data/output/enriched_ncec_april_2026.csv")
-        out_xlsx = Path("data/output/enriched_ncec_april_2026.xlsx")
-        pd.DataFrame(output_rows).to_csv(out_csv, index=False)
-        pd.DataFrame(output_rows).to_excel(out_xlsx, index=False)
+        _flush_outputs(output_rows)
         db.close()
         return run_id
+
+
+def _flush_outputs(output_rows: list[dict]) -> None:
+    out_csv = Path("data/output/enriched_ncec_april_2026.csv")
+    out_xlsx = Path("data/output/enriched_ncec_april_2026.xlsx")
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(output_rows)
+    df.to_csv(out_csv, index=False)
+    df.to_excel(out_xlsx, index=False)
