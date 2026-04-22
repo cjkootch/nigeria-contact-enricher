@@ -13,6 +13,10 @@ __pycache__/
 *.db
 *-journal
 .env
+
+# Updated live by background scraper; re-commit with `git add -f` once run completes
+data/output/enriched_ncec_april_2026.csv
+data/output/enriched_ncec_april_2026.xlsx
 coverage/
 
 # Build artifacts
