@@ -47,6 +47,10 @@ def score_website(company_name: str, category: str | None, url: str, page_title:
         + contact_about * SCORING_WEIGHTS["contact_about_exists"]
         + brand_consistency * SCORING_WEIGHTS["branding_consistency"]
     )
+    # Guard against unrelated sites passing on Nigeria/category signals alone:
+    # require either a name-in-title match or meaningful domain overlap.
+    if not exact_title and domain < 0.4 and fuzzy < 0.75:
+        total = min(total, 45)
     status = "no_match"
     if total >= 80:
         status = "auto_accept"

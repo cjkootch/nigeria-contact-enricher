@@ -15,15 +15,25 @@ from .config import settings
 logger = logging.getLogger(__name__)
 
 EXCLUDED_DOMAINS = {
-    "facebook.com",
-    "linkedin.com",
-    "instagram.com",
-    "twitter.com",
-    "x.com",
-    "wikipedia.org",
-    "youtube.com",
-    "google.com",
-    "bing.com",
+    # Social / forums
+    "facebook.com", "linkedin.com", "instagram.com", "twitter.com", "x.com",
+    "reddit.com", "quora.com", "youtube.com", "tiktok.com", "pinterest.com",
+    "medium.com", "tumblr.com",
+    # Search engines / reference
+    "google.com", "bing.com", "wikipedia.org", "wiktionary.org",
+    "dictionary.com", "britannica.com",
+    # Business registries / aggregators
+    "crunchbase.com", "opencorporates.com", "bloomberg.com", "dnb.com",
+    "companieshistory.com", "bizdirectory.com.ng", "company-information.service.gov.uk",
+    "find-and-update.company-information.service.gov.uk",
+    "nigeria24.me", "ng-check.com", "b2bhint.com", "mkt-icp.com", "icpcredit.com",
+    "nigerianfinder.com", "nigeriayp.com", "finelib.com", "connectnigeria.com",
+    "vconnect.com", "businesslist.com.ng", "businesscheck.co.nz",
+    # Reviews / jobs / maps
+    "trustpilot.com", "glassdoor.com", "indeed.com", "yellowpages.com",
+    "yelp.com", "sulekha.com", "mapquest.com", "foursquare.com",
+    # Misc noise observed in earlier runs
+    "gitexnigeria.ng", "savycon.com",
 }
 
 
