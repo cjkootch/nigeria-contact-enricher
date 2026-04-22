@@ -35,9 +35,36 @@ class EnrichmentPipeline:
         run.total_rows = len(rows)
         db.commit()
 
+        completed_keys = {
+            (c.source_sheet, c.source_row_number): c
+            for c in db.query(Company).filter(Company.processing_status.in_(["auto_accept", "review_needed", "no_match", "search_unavailable"])).all()
+        }
+
         output_rows = []
         for row in rows:
             try:
+                key = (row.get("_source_sheet", "Sheet1"), row.get("_source_row_number", 0))
+                if key in completed_keys:
+                    prior = completed_keys[key]
+                    ec = prior.extracted_contacts[0] if prior.extracted_contacts else None
+                    wc = max(prior.website_candidates, key=lambda x: x.website_match_score) if prior.website_candidates else None
+                    output_rows.append({
+                        "company_name": prior.company_name_raw,
+                        "service_category": prior.service_category,
+                        "certificate_number": prior.certificate_number,
+                        "found_website": (ec.accepted_website_url if ec else (wc.candidate_url if wc else None)),
+                        "email": ec.email if ec else None,
+                        "phone": ec.phone if ec else None,
+                        "website_match_score": wc.website_match_score if wc else 0,
+                        "contact_score": ec.contact_score if ec else 0,
+                        "final_confidence": ec.final_confidence if ec else 0,
+                        "status": prior.processing_status,
+                        "notes": prior.notes,
+                    })
+                    if len(output_rows) % 50 == 0:
+                        _flush_outputs(output_rows)
+                    continue
+
                 company_name = str(row.get("company_name") or row.get("company_name_raw") or "").strip()
                 service_category = str(row.get("category_of_ncec") or row.get("service_category") or "")
                 company = Company(

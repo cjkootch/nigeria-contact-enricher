@@ -92,7 +92,49 @@ class DuckDuckGoSearchProvider(SearchProvider):
 
 
 def get_search_provider() -> SearchProvider:
+    if settings.search_provider == "brave":
+        return BraveSearchProvider()
     if settings.search_provider == "duckduckgo":
         return DuckDuckGoSearchProvider()
     logger.warning("Using stub search provider")
     return StubSearchProvider()
+
+
+class BraveSearchProvider(SearchProvider):
+    base_url = "https://api.search.brave.com/res/v1/web/search"
+
+    def __init__(self) -> None:
+        if not settings.brave_api_key:
+            raise RuntimeError("BRAVE_API_KEY not set")
+
+    def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+        time.sleep(settings.request_delay_seconds)
+        response = None
+        for attempt in range(settings.max_retries):
+            response = requests.get(
+                self.base_url,
+                params={"q": query, "count": min(limit, 20)},
+                timeout=settings.request_timeout_seconds,
+                headers={
+                    "X-Subscription-Token": settings.brave_api_key,
+                    "Accept": "application/json",
+                    "User-Agent": settings.user_agent,
+                },
+            )
+            if response.status_code not in (429, 503):
+                break
+            backoff = settings.request_delay_seconds * (2 ** attempt) + attempt
+            logger.warning("Brave %s for %r, sleeping %.1fs (attempt %d/%d)", response.status_code, query, backoff, attempt + 1, settings.max_retries)
+            time.sleep(backoff)
+        response.raise_for_status()
+        payload = response.json()
+        results: list[SearchResult] = []
+        for item in (payload.get("web") or {}).get("results", []):
+            url = item.get("url") or ""
+            domain = urlparse(url).netloc.lower().replace("www.", "")
+            if any(domain.endswith(x) for x in EXCLUDED_DOMAINS):
+                continue
+            results.append(SearchResult(url=url, title=item.get("title", ""), snippet=item.get("description", "")))
+            if len(results) >= limit:
+                break
+        return results

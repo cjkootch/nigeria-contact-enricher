@@ -125,8 +125,25 @@ Rewards:
 - Provider interface: `services/enricher/enricher/search.py`
 - Current providers:
   - `StubSearchProvider`
-  - `DuckDuckGoSearchProvider`
+  - `DuckDuckGoSearchProvider` (rate-limited; only viable for small batches)
+  - `BraveSearchProvider` (recommended; needs `BRAVE_API_KEY`)
 - Controlled by `SEARCH_PROVIDER` env var.
+
+### Running the full dataset locally with Brave
+
+```bash
+cp .env.example .env
+# edit .env: SEARCH_PROVIDER=brave, BRAVE_API_KEY=<your key>
+make install
+# default subset is 25 rows; edit services/enricher/run_pipeline.py
+# and remove the limit=25 arg to process all 2,775 rows
+make run-subset
+```
+
+Output flushes to `data/output/enriched_ncec_april_2026.{csv,xlsx}` every
+10 rows. Re-running is idempotent: companies already processed
+(any non-pending status) are skipped via the SQLite DB at
+`data/ncec_enricher.db`. Delete that file to force a fresh start.
 
 ## Output files
 

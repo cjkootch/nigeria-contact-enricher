@@ -15,6 +15,7 @@ class Settings:
     request_delay_seconds: float = float(os.getenv("REQUEST_DELAY_SECONDS", "1"))
     max_retries: int = int(os.getenv("MAX_RETRIES", "3"))
     enable_playwright: bool = os.getenv("ENABLE_PLAYWRIGHT", "false").lower() == "true"
+    brave_api_key: str = os.getenv("BRAVE_API_KEY", "")
 
 
 settings = Settings()
