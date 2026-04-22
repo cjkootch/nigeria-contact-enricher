@@ -11,6 +11,7 @@ __pycache__/
 # Local data artifacts
 *.sqlite3
 *.db
+*-journal
 .env
 coverage/
 
