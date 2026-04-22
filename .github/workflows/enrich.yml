@@ -1,0 +1,98 @@
+name: Enrich
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Row limit (blank = full dataset)"
+        required: false
+        default: ""
+
+concurrency:
+  group: enrich
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      SEARCH_PROVIDER: brave
+      BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+      USER_AGENT: "NCEC-Enricher/0.1 (+gha)"
+      REQUEST_TIMEOUT_SECONDS: "20"
+      REQUEST_DELAY_SECONDS: "1.1"
+      CRAWL_DELAY_SECONDS: "0.3"
+      MAX_RETRIES: "5"
+      LIMIT: ${{ github.event.inputs.limit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/enricher/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r services/enricher/requirements.txt
+
+      - name: Sanity check BRAVE_API_KEY
+        run: |
+          if [ -z "$BRAVE_API_KEY" ]; then
+            echo "::error::BRAVE_API_KEY secret is not set on this repo"
+            exit 1
+          fi
+
+      - name: Run enrichment pipeline (time-limited)
+        id: enrich
+        run: |
+          mkdir -p data/input data/output
+          # Give the pipeline up to 5h30m; leaves headroom for commit+push within the 6hr job cap.
+          timeout --signal=INT --preserve-status 19800 python -c "
+          import os, sys, logging
+          sys.path.insert(0, 'services/enricher')
+          logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+          from pathlib import Path
+          from enricher.db import init_db
+          from enricher.pipeline import EnrichmentPipeline
+          init_db()
+          limit = int(os.environ['LIMIT']) if os.environ.get('LIMIT') else None
+          rid = EnrichmentPipeline().run(Path('data/input/NCEC_Update_April_2026.xlsx'), limit=limit)
+          print('run_id:', rid)
+          " || true
+
+      - name: Progress summary
+        run: |
+          python - <<'PY'
+          import sqlite3
+          try:
+              c = sqlite3.connect('data/ncec_enricher.db').cursor()
+              stat = dict((s, n) for n, s in c.execute('SELECT COUNT(*), processing_status FROM companies GROUP BY processing_status'))
+              em = c.execute("SELECT COUNT(*) FROM extracted_contacts WHERE email IS NOT NULL AND email != ''").fetchone()[0]
+              ph = c.execute("SELECT COUNT(*) FROM extracted_contacts WHERE phone IS NOT NULL AND phone != ''").fetchone()[0]
+              print('progress:', stat, 'total=', sum(stat.values()), 'email=', em, 'phone=', ph)
+          except Exception as e:
+              print('no DB yet:', e)
+          PY
+
+      - name: Commit checkpoint
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/ncec_enricher.db data/output/enriched_ncec_april_2026.csv data/output/enriched_ncec_april_2026.xlsx 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "Enrichment checkpoint from GH Actions run ${{ github.run_number }}"
+            for i in 1 2 3 4; do
+              if git push; then break; fi
+              sleep $((2 ** i))
+            done
+          fi

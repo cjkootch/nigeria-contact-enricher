@@ -8,15 +8,14 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# Local data artifacts
-*.sqlite3
-*.db
-*-journal
+# Secrets
 .env
 
-# Updated live by background scraper; re-commit with `git add -f` once run completes
-data/output/enriched_ncec_april_2026.csv
-data/output/enriched_ncec_april_2026.xlsx
+# Local data artifacts (but allow the persistent enricher DB to be committed so GH Actions can resume)
+*.sqlite3
+*-journal
+*.db
+!data/ncec_enricher.db
 coverage/
 
 # Build artifacts

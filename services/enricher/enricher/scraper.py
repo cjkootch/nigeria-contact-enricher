@@ -36,7 +36,7 @@ def allowed_by_robots(url: str) -> bool:
 
 
 def fetch_page(url: str) -> str:
-    time.sleep(settings.request_delay_seconds)
+    time.sleep(settings.crawl_delay_seconds)
     if not allowed_by_robots(url):
         return ""
     resp = requests.get(url, timeout=settings.request_timeout_seconds, headers={"User-Agent": settings.user_agent})

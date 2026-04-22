@@ -13,6 +13,7 @@ class Settings:
     user_agent: str = os.getenv("USER_AGENT", "NCEC-Enricher/0.1 (+local)")
     request_timeout_seconds: int = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
     request_delay_seconds: float = float(os.getenv("REQUEST_DELAY_SECONDS", "1"))
+    crawl_delay_seconds: float = float(os.getenv("CRAWL_DELAY_SECONDS", "0.3"))
     max_retries: int = int(os.getenv("MAX_RETRIES", "3"))
     enable_playwright: bool = os.getenv("ENABLE_PLAYWRIGHT", "false").lower() == "true"
     brave_api_key: str = os.getenv("BRAVE_API_KEY", "")
