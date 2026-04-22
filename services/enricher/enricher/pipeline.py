@@ -88,20 +88,21 @@ class EnrichmentPipeline:
                     f"{company_name}",
                     f"{company_name} Nigeria",
                     f"{company_name} {service_category}".strip(),
-                    f"{company_name} oil and gas Nigeria",
                 ]
                 best = None
                 best_status = "no_match"
                 query_errors: list[str] = []
                 for q in queries:
+                    if best is not None and best.website_match_score >= 70:
+                        break
                     try:
-                        results = self.search.search(q, limit=3)
+                        results = self.search.search(q, limit=2)
                     except Exception as sexc:
                         query_errors.append(f"{q!r}: {sexc}")
                         continue
                     for i, result in enumerate(results, start=1):
-                        pages = crawl_candidate_pages(result.url, max_pages=3)
-                        body = "\n".join(pages.values())
+                        pages = crawl_candidate_pages(result.url, max_pages=1)
+                        body = "\n".join(pages.values()) or result.snippet
                         score = score_website(
                             company_name=company_name,
                             category=service_category,
@@ -133,7 +134,7 @@ class EnrichmentPipeline:
                             best_status = score["status"]
                 if best:
                     best.accepted_boolean = best.website_match_score >= 80
-                    pages = crawl_candidate_pages(best.candidate_url)
+                    pages = crawl_candidate_pages(best.candidate_url, max_pages=3)
                     contacts = extract_contacts(pages)
                     contact_score = score_contacts(best.candidate_url, pages, contacts.get("email"), contacts.get("phone"), contacts.get("address"))
                     final_confidence = round(0.65 * best.website_match_score + 0.35 * contact_score, 2)
