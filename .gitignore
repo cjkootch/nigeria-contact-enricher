@@ -1,0 +1,19 @@
+# Node
+node_modules/
+.next/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local data artifacts
+*.sqlite3
+*.db
+.env
+coverage/
+
+# Build artifacts
+*.log
+.DS_Store

@@ -1,0 +1,3 @@
+company_name,service_category,certificate_number,found_website,email,phone,website_match_score,contact_score,final_confidence,status,notes
+CHUBROCK GLOBAL VENTURES LIMITED,Procurement and Supplies,NCEC/PS-C-5/9577,https://example.com,,,58.93,0.0,38.3,no_match,
+BLACK CREEK GLOBAL RESOURCES LIMITED,Construction and Movable Equipment,NCEC/EC-C-5/7468,https://example.com,,,58.93,0.0,38.3,no_match,

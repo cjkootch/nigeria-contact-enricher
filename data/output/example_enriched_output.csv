@@ -1,0 +1,2 @@
+company_name,service_category,certificate_number,found_website,email,phone,website_match_score,contact_score,final_confidence,status,notes
+ACME OIL SERVICES LTD,Services and Support,NCEC/SS-C-5/0001,https://acme.com.ng,info@acme.com.ng,+234 800 111 2222,88,70,81.7,auto_accept,
